@@ -31,8 +31,6 @@ orchestration) swap. That portability is itself a design goal (see Q1 and Q3).
 | `BRONZE → GOLD fraud` | `gold_fraud.py` reads bronze only (no silver dependency); `RANGE`/`ROWS` windows + merchant_locations join |
 | Part B | Independent PostgreSQL-native SQL path — same logic, different engine. Run it standalone or compare against Part A output |
 
-![Local pipeline execution](local/q1_pipeline/img/semestabank_local_pipeline.png)
-
 > **Production architecture diagram:** [`architecture/semestabank_platform.html`](architecture/semestabank_platform.html) — open in browser for the full Databricks + AWS platform layout with sources, ingestion, medallion, engines, serving, and governance layers. Also available as [ASCII diagram in ARCHITECTURE.md](architecture/ARCHITECTURE.md).
 
 ---
