@@ -1,8 +1,4 @@
-# SemestaBank Data Platform — Level-2 Data Engineer Assessment
-
-**Single, self-contained answer to the Insignia (AWS BU) Data Engineer take-home.**
-Everything you need to evaluate the three questions — runnable code, SQL, architecture,
-and the reasoning behind each decision — lives in this folder, organized as a small wiki.
+# SemestaBank Data Platform
 
 > **Scenario in one line:** SemestaBank is an Indonesian digital-first bank (4.2M customers,
 > 2M+ txns/day, 50K clickstream events/sec) under an OJK mandate to demonstrate data
