@@ -1,0 +1,130 @@
+# =====================================================================
+# SemestaBank Lakehouse — cloud-agnostic local stack
+#
+# Source:  PostgreSQL (stands in for Oracle core banking)
+# Lake:    MinIO (Bronze → Silver → Gold, all Parquet)
+# Compute: Spark (JDBC ingest + PySpark ELT + Spark SQL gold views)
+#
+#   docker compose --profile run up      # runs the full pipeline once
+#   docker compose --profile orchestrate up  # Airflow UI on :8080
+# =====================================================================
+name: semestabank-lakehouse
+
+services:
+  # --------------------------------------------------------------- silver + gold lake (S3-compatible)
+  minio:
+    image: minio/minio:latest
+    container_name: nb-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${AWS_ACCESS_KEY_ID}
+      MINIO_ROOT_PASSWORD: ${AWS_SECRET_ACCESS_KEY}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - nb-miniodata:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # Create all three medallion buckets before any job runs.
+  minio-init:
+    image: minio/mc:latest
+    depends_on: { minio: { condition: service_healthy } }
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 ${AWS_ACCESS_KEY_ID} ${AWS_SECRET_ACCESS_KEY} &&
+      mc mb --ignore-existing local/${S3_BUCKET_BRONZE} &&
+      mc mb --ignore-existing local/${S3_BUCKET} &&
+      mc mb --ignore-existing local/${S3_BUCKET_GOLD} &&
+      echo 'buckets ready: bronze silver gold' "
+    restart: "no"
+
+  # --------------------------------------------------------------- compute (Spark)
+  # Reads from PostgreSQL (source) via JDBC → MinIO bronze, then runs
+  # silver → gold transformations entirely on MinIO Parquet.
+  spark:
+    build: ./spark
+    container_name: nb-spark
+    depends_on:
+      postgres:   { condition: service_healthy }
+      minio-init: { condition: service_completed_successfully }
+    environment:
+      # ── Source DB (PostgreSQL, standing in for Oracle) ──
+      JDBC_URL:        ${JDBC_URL}
+      JDBC_USER:       ${JDBC_USER}
+      JDBC_PASSWORD:   ${JDBC_PASSWORD}
+      # ── MinIO / S3 config ──
+      S3_ENDPOINT:     http://minio:9000
+      S3_REGION:       us-east-1
+      S3_BUCKET_BRONZE: ${S3_BUCKET_BRONZE}
+      S3_BUCKET:       ${S3_BUCKET}
+      S3_PATH:         ${S3_PATH}
+      S3_BUCKET_GOLD:  ${S3_BUCKET_GOLD}
+      AWS_ACCESS_KEY_ID:     ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      MIN_ACCOUNTS:    "1"
+      DQ_FAIL_HARD:    "1"
+    volumes:
+      - ./spark/jobs:/opt/spark/jobs:ro
+    entrypoint: ["/bin/bash", "/opt/spark/jobs/pipeline.sh"]
+    profiles: ["run"]
+
+  # --------------------------------------------------------------- source database (stands in for Oracle)
+  postgres:
+    image: postgres:16-alpine
+    container_name: nb-postgres
+    environment:
+      POSTGRES_USER: ${JDBC_USER:-etl_user}
+      POSTGRES_PASSWORD: ${JDBC_PASSWORD:-etl_pass123}
+      POSTGRES_DB: semestabank
+    ports: ["5433:5432"]
+    volumes:
+      - ./seed/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      # Shared input dataset lives at the repo root (not duplicated into Final_Answer).
+      # Path is relative to this compose file: Final_Answer/local/q1_pipeline -> repo root.
+      - ../../../semestabank_dataset:/dataset:ro
+      - nb-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${JDBC_USER:-etl_user} -d semestabank"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # --------------------------------------------------------------- orchestration (Airflow, optional)
+  airflow:
+    build: ./airflow
+    container_name: nb-airflow
+    depends_on:
+      postgres:   { condition: service_healthy }
+      minio-init: { condition: service_completed_successfully }
+    environment:
+      AIRFLOW__CORE__EXECUTOR: SequentialExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: sqlite:////opt/airflow/airflow.db
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      _AIRFLOW_WWW_USER_USERNAME: admin
+      _AIRFLOW_WWW_USER_PASSWORD: admin
+      JDBC_URL:        ${JDBC_URL}
+      JDBC_USER:       ${JDBC_USER}
+      JDBC_PASSWORD:   ${JDBC_PASSWORD}
+      S3_ENDPOINT:     http://minio:9000
+      S3_BUCKET_BRONZE: ${S3_BUCKET_BRONZE}
+      S3_BUCKET:       ${S3_BUCKET}
+      S3_PATH:         ${S3_PATH}
+      S3_BUCKET_GOLD:  ${S3_BUCKET_GOLD}
+      AWS_ACCESS_KEY_ID:     ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      COMPOSE_PROJECT_NAME: semestabank-lakehouse
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports: ["8080:8080"]
+    command: standalone
+    profiles: ["orchestrate"]
+
+volumes:
+  nb-pgdata:
+  nb-miniodata:

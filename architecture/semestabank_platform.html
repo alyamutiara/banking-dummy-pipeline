@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SemestaBank Data Platform</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --c-bg: #0f1117;
+    --c-surface: #1a1d27;
+    --c-border: #2a2d3e;
+  }
+  body {
+    background: #0f1117;
+    color: #e2e8f0;
+    font-family: 'Inter', system-ui, sans-serif;
+    padding: 40px 32px 80px;
+    min-height: 100vh;
+  }
+  .header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 40px;
+    border-bottom: 1px solid #2a2d3e;
+    padding-bottom: 24px;
+    gap: 20px;
+  }
+  .badge {
+    display: inline-block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: #60a5fa;
+    background: #1e3a5f;
+    border: 1px solid #2a5298;
+    border-radius: 4px;
+    padding: 3px 8px;
+    margin-bottom: 12px;
+  }
+  h1 { font-size: 26px; font-weight: 700; color: #f8fafc; line-height: 1.2; }
+  .subtitle { margin-top: 6px; font-size: 13px; color: #64748b; }
+  .download-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: #3B82F6;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 20px;
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+    margin-top: 4px;
+  }
+  .download-btn:hover { background: #2563eb; }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 28px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: #94a3b8;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+  .diagram { display: flex; flex-direction: column; gap: 4px; }
+
+  .flow-arrow {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 28px;
+    color: #334155;
+    font-size: 18px;
+  }
+
+  .layer {
+    border: 1px solid #2a2d3e;
+    border-radius: 12px;
+    background: #1a1d27;
+    overflow: hidden;
+  }
+  .layer-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    border-bottom: 1px solid #2a2d3e;
+  }
+  .layer-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .layer-title {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: #64748b;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .layer-body {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 14px 16px;
+  }
+  .layer-body.col { flex-direction: column; }
+
+  .node {
+    flex: 1 1 180px;
+    min-width: 160px;
+    border-radius: 8px;
+    padding: 12px 14px;
+    border: 1px solid;
+  }
+  .node-name { font-size: 12px; font-weight: 600; line-height: 1.3; margin-bottom: 4px; }
+  .node-meta { font-size: 10px; font-family: 'JetBrains Mono', monospace; line-height: 1.5; opacity: .75; }
+  .node-tag {
+    display: inline-block;
+    font-size: 9px;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 500;
+    border-radius: 3px;
+    padding: 1px 5px;
+    margin-top: 6px;
+  }
+
+  .ns { background: #1e3a5f; border-color: #2a5298; }
+  .ns .node-name { color: #93c5fd; }
+  .ns .node-tag { background: #0f2040; color: #60a5fa; }
+
+  .ni { background: #3b2267; border-color: #5b21b6; }
+  .ni .node-name { color: #c4b5fd; }
+  .ni .node-tag { background: #2e1a50; color: #a78bfa; }
+
+  .nb { background: #5c3a00; border-color: #92400e; }
+  .nb .node-name { color: #fcd34d; }
+  .nb .node-tag { background: #3d2600; color: #fbbf24; }
+
+  .nsl { background: #2a3140; border-color: #334155; }
+  .nsl .node-name { color: #cbd5e1; }
+  .nsl .node-tag { background: #1e293b; color: #94a3b8; }
+
+  .ng { background: #0f3d1f; border-color: #14532d; }
+  .ng .node-name { color: #86efac; }
+  .ng .node-tag { background: #052e16; color: #4ade80; }
+
+  .ne { background: #5c2800; border-color: #7c2d12; }
+  .ne .node-name { color: #fdba74; }
+  .ne .node-tag { background: #3d1a00; color: #fb923c; }
+
+  .nv { background: #0a3040; border-color: #164e63; }
+  .nv .node-name { color: #67e8f9; }
+  .nv .node-tag { background: #052030; color: #22d3ee; }
+
+  .ngo { background: #4a1030; border-color: #831843; }
+  .ngo .node-name { color: #f9a8d4; }
+  .ngo .node-tag { background: #2d0820; color: #f472b6; }
+
+  .dual-col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+  .connections {
+    margin-top: 24px;
+    border: 1px solid #2a2d3e;
+    border-radius: 10px;
+    padding: 16px 20px;
+    background: #1a1d27;
+  }
+  .connections-title {
+    font-size: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: #475569;
+    margin-bottom: 12px;
+  }
+  .conn-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
+  .conn-item { display: flex; align-items: flex-start; gap: 8px; font-size: 11px; color: #64748b; line-height: 1.4; }
+  .conn-arrow { flex-shrink: 0; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #3B82F6; margin-top: 1px; }
+
+  @media print {
+    body { background: #fff !important; color: #0f1117 !important; }
+    .download-btn { display: none !important; }
+    h1 { color: #0f1117 !important; }
+    .layer, .connections { border-color: #e2e8f0 !important; background: #f8fafc !important; }
+    .node { background: #f1f5f9 !important; border-color: #e2e8f0 !important; }
+    .node-name { color: #1e293b !important; }
+    .node-meta { color: #475569 !important; }
+    .layer-title, .connections-title { color: #64748b !important; }
+    .legend-item { color: #334155 !important; }
+    .subtitle { color: #475569 !important; }
+    .conn-item { color: #334155 !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <div class="badge">Architecture Reference</div>
+    <h1>SemestaBank Data Platform</h1>
+    <p class="subtitle">Multi-layer lakehouse · Databricks + S3 + Delta Lake · Governed by Unity Catalog</p>
+  </div>
+  <button class="download-btn" onclick="window.print()">
+    ↓ Save / Print
+  </button>
+</div>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:#3B82F6"></div>Data Sources</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#8B5CF6"></div>Ingestion</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#F59E0B"></div>Bronze</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#94A3B8"></div>Silver</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#22C55E"></div>Gold</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#F97316"></div>Processing</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#06B6D4"></div>Serving</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#EC4899"></div>Governance</div>
+</div>
+
+<div class="diagram">
+
+  <!-- SOURCES -->
+  <div class="layer">
+    <div class="layer-header">
+      <div class="layer-dot" style="background:#3B82F6"></div>
+      <span class="layer-title">Data Sources</span>
+    </div>
+    <div class="layer-body">
+      <div class="node ns">
+        <div class="node-name">Oracle Core Bank</div>
+        <div class="node-meta">2M transactions / day</div>
+        <span class="node-tag">OLTP</span>
+      </div>
+      <div class="node ns">
+        <div class="node-name">Mobile App</div>
+        <div class="node-meta">50K events / sec</div>
+        <span class="node-tag">Clickstream</span>
+      </div>
+      <div class="node ns">
+        <div class="node-name">Zendesk Support</div>
+        <div class="node-meta">15K tickets / month</div>
+        <span class="node-tag">SaaS CRM</span>
+      </div>
+      <div class="node ns">
+        <div class="node-name">Braze Marketing API</div>
+        <div class="node-meta">Campaign &amp; engagement data</div>
+        <span class="node-tag">SaaS</span>
+      </div>
+      <div class="node ns">
+        <div class="node-name">Google Ads API</div>
+        <div class="node-meta">Ad performance metrics</div>
+        <span class="node-tag">SaaS</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="flow-arrow">↓</div>
+
+  <!-- INGESTION -->
+  <div class="layer">
+    <div class="layer-header">
+      <div class="layer-dot" style="background:#8B5CF6"></div>
+      <span class="layer-title">Ingestion</span>
+    </div>
+    <div class="layer-body">
+      <div class="node ni">
+        <div class="node-name">AWS DMS (CDC)</div>
+        <div class="node-meta">Oracle → S3 raw · batch every 1h</div>
+        <span class="node-tag">CDC</span>
+      </div>
+      <div class="node ni">
+        <div class="node-name">AWS MSK / Kafka</div>
+        <div class="node-meta">Clickstream topic · 48 partitions</div>
+        <span class="node-tag">Streaming</span>
+      </div>
+      <div class="node ni">
+        <div class="node-name">Airbyte</div>
+        <div class="node-meta">Zendesk + Braze + Google Ads · REST → S3</div>
+        <span class="node-tag">ELT</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="flow-arrow">↓</div>
+
+  <!-- BRONZE -->
+  <div class="layer">
+    <div class="layer-header">
+      <div class="layer-dot" style="background:#F59E0B"></div>
+      <span class="layer-title">Bronze — Raw (S3 + Delta Lake)</span>
+    </div>
+    <div class="layer-body">
+      <div class="node nb">
+        <div class="node-name">accounts_raw</div>
+        <div class="node-meta">S3 · partitioned by load date</div>
+        <span class="node-tag">Delta</span>
+      </div>
+      <div class="node nb">
+        <div class="node-name">clickstream_events_raw</div>
+        <div class="node-meta">Kafka consumer offset tracking</div>
+        <span class="node-tag">Delta</span>
+      </div>
+      <div class="node nb">
+        <div class="node-name">zendesk_tickets_raw</div>
+        <div class="node-meta">Full refresh + incremental</div>
+        <span class="node-tag">Delta</span>
+      </div>
+      <div class="node nb">
+        <div class="node-name">braze_campaigns</div>
+        <div class="node-meta">Campaign + event data</div>
+        <span class="node-tag">Delta</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="flow-arrow">↓</div>
+
+  <!-- SILVER -->
+  <div class="layer">
+    <div class="layer-header">
+      <div class="layer-dot" style="background:#94A3B8"></div>
+      <span class="layer-title">Silver — Cleaned</span>
+    </div>
+    <div class="layer-body">
+      <div class="node nsl">
+        <div class="node-name">account_snapshots</div>
+        <div class="node-meta">partitionBy(snapshot_date)<br>Z-ORDER by customer_id</div>
+        <span class="node-tag">SCD</span>
+      </div>
+      <div class="node nsl">
+        <div class="node-name">clickstream_silver</div>
+        <div class="node-meta">JSONB parsed · dedup event_id<br>Z-ORDER by customer_id</div>
+        <span class="node-tag">Streaming</span>
+      </div>
+      <div class="node nsl">
+        <div class="node-name">support_tickets_silver</div>
+        <div class="node-meta">Cleaned, typed, joined</div>
+        <span class="node-tag">Batch</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="flow-arrow">↓</div>
+
+  <!-- GOLD -->
+  <div class="layer">
+    <div class="layer-header">
+      <div class="layer-dot" style="background:#22C55E"></div>
+      <span class="layer-title">Gold — Business Ready</span>
+    </div>
+    <div class="layer-body">
+      <div class="node ng">
+        <div class="node-name">customer_health_scorecard</div>
+        <div class="node-meta">Delta Live Tables pipeline</div>
+        <span class="node-tag">DLT</span>
+      </div>
+      <div class="node ng">
+        <div class="node-name">fraud_detection_alerts</div>
+        <div class="node-meta">Delta Live Tables pipeline</div>
+        <span class="node-tag">DLT</span>
+      </div>
+      <div class="node ng">
+        <div class="node-name">credit_scoring_features</div>
+        <div class="node-meta">ML Feature Store</div>
+        <span class="node-tag">Feature Store</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="flow-arrow">↓</div>
+
+  <!-- PROCESSING + GOVERNANCE -->
+  <div class="dual-col">
+    <div class="layer">
+      <div class="layer-header">
+        <div class="layer-dot" style="background:#F97316"></div>
+        <span class="layer-title">Processing Engines</span>
+      </div>
+      <div class="layer-body col">
+        <div class="node ne">
+          <div class="node-name">Databricks Spark — Batch</div>
+          <div class="node-meta">account_snapshot.py · same code as local Docker</div>
+          <span class="node-tag">Batch</span>
+        </div>
+        <div class="node ne">
+          <div class="node-name">Databricks Structured Streaming</div>
+          <div class="node-meta">Bronze → Silver clickstream</div>
+          <span class="node-tag">Streaming</span>
+        </div>
+        <div class="node ne">
+          <div class="node-name">Databricks ML Runtime</div>
+          <div class="node-meta">Credit scoring + MLflow tracking</div>
+          <span class="node-tag">ML</span>
+        </div>
+        <div class="node ne">
+          <div class="node-name">Databricks SQL Warehouse</div>
+          <div class="node-meta">Serverless 2XL · Gold views · BI queries · Regulatory exports</div>
+          <span class="node-tag">Serverless</span>
+        </div>
+        <div class="node ne">
+          <div class="node-name">Airflow (MWAA)</div>
+          <div class="node-meta">Orchestrates all pipelines</div>
+          <span class="node-tag">Orchestration</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="layer">
+      <div class="layer-header">
+        <div class="layer-dot" style="background:#EC4899"></div>
+        <span class="layer-title">Governance</span>
+      </div>
+      <div class="layer-body col">
+        <div class="node ngo">
+          <div class="node-name">Unity Catalog</div>
+          <div class="node-meta">
+            Column-level lineage (Oracle → BI)<br>
+            RBAC + ABAC access control<br>
+            Audit log — every query recorded<br>
+            Lakehouse Federation (Oracle, Zendesk as foreign catalogs)
+          </div>
+          <span class="node-tag">Catalog</span>
+        </div>
+        <div class="node ngo">
+          <div class="node-name">OpenLineage → Marquez</div>
+          <div class="node-meta">
+            Airflow event lineage<br>
+            Fallback for non-Databricks pipelines<br>
+            (Airbyte / custom Lambda)
+          </div>
+          <span class="node-tag">Lineage</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="flow-arrow">↓</div>
+
+  <!-- SERVING -->
+  <div class="layer">
+    <div class="layer-header">
+      <div class="layer-dot" style="background:#06B6D4"></div>
+      <span class="layer-title">Serving Layer</span>
+    </div>
+    <div class="layer-body">
+      <div class="node nv">
+        <div class="node-name">BI Dashboards</div>
+        <div class="node-meta">Tableau · Looker · Power BI<br>← Databricks SQL Warehouse</div>
+        <span class="node-tag">BI</span>
+      </div>
+      <div class="node nv">
+        <div class="node-name">ML Credit Scoring</div>
+        <div class="node-meta">MLflow Model Registry · real-time inference</div>
+        <span class="node-tag">ML Serving</span>
+      </div>
+      <div class="node nv">
+        <div class="node-name">OJK Regulatory Reports</div>
+        <div class="node-meta">CSV / API export ← Gold views</div>
+        <span class="node-tag">Compliance</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Key connections -->
+<div class="connections">
+  <div class="connections-title">Key Data Flow Connections</div>
+  <div class="conn-grid">
+    <div class="conn-item"><span class="conn-arrow">→</span>Oracle → AWS DMS (CDC) → accounts_raw → account_snapshots</div>
+    <div class="conn-item"><span class="conn-arrow">→</span>Mobile App → MSK Kafka → clickstream_raw → clickstream_silver</div>
+    <div class="conn-item"><span class="conn-arrow">→</span>Zendesk / Braze / Ads → Airbyte → Bronze → Silver</div>
+    <div class="conn-item"><span class="conn-arrow">→</span>Silver → Delta Live Tables → customer_health_scorecard</div>
+    <div class="conn-item"><span class="conn-arrow">→</span>Silver → Delta Live Tables → fraud_detection_alerts</div>
+    <div class="conn-item"><span class="conn-arrow">→</span>Silver → Feature engineering → credit_scoring_features</div>
+    <div class="conn-item"><span class="conn-arrow">→</span>Gold views → Databricks SQL → BI dashboards</div>
+    <div class="conn-item"><span class="conn-arrow">→</span>credit_scoring_features → MLflow → credit scoring API</div>
+    <div class="conn-item"><span class="conn-arrow">~</span>Airflow MWAA orchestrates all batch + ML jobs</div>
+    <div class="conn-item"><span class="conn-arrow">~</span>Unity Catalog governs lineage + access across all layers</div>
+  </div>
+</div>
+
+</body>
+</html>

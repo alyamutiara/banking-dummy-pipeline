@@ -1,0 +1,20 @@
+# Secrets — never commit
+.env
+
+# Data / runtime artefacts
+*.parquet
+__pycache__/
+*.pyc
+.DS_Store
+
+# Airflow
+airflow.db
+airflow-webserver.pid
+logs/
+
+# PROD
+dumps/
+dataset/
+
+# AI Agent
+.claude

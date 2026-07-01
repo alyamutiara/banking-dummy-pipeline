@@ -1,0 +1,68 @@
+{
+  "Comment": "SemestaBank Q1(c) — AWS-native orchestration (Step Functions). Runs bronze -> silver snapshot -> gold, then triggers credit scoring. Each Spark step retries up to 3 times; after retries are exhausted an SNS alert pages the on-call engineer. The snapshot step carries a 30-minute timeout to enforce the SLA. This is the Step Functions twin of the local Airflow DAG and the Databricks workflow.json.",
+  "StartAt": "BronzeIngest",
+  "States": {
+    "BronzeIngest": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::aws-sdk:emrserverless:startJobRun.sync",
+      "Parameters": {
+        "ApplicationId": "${EMR_SERVERLESS_APP_ID}",
+        "ExecutionRoleArn": "arn:aws:iam::${ACCOUNT_ID}:role/semestabank-emr-serverless-exec",
+        "JobDriver": { "SparkSubmit": { "EntryPoint": "s3://semestabank-artifacts/jobs/bronze_ingest.py" } }
+      },
+      "Retry": [{ "ErrorEquals": ["States.ALL"], "MaxAttempts": 3, "IntervalSeconds": 120, "BackoffRate": 2.0 }],
+      "Catch": [{ "ErrorEquals": ["States.ALL"], "Next": "AlertOnCall" }],
+      "Next": "AccountSnapshot"
+    },
+    "AccountSnapshot": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::aws-sdk:emrserverless:startJobRun.sync",
+      "TimeoutSeconds": 1800,
+      "Parameters": {
+        "ApplicationId": "${EMR_SERVERLESS_APP_ID}",
+        "ExecutionRoleArn": "arn:aws:iam::${ACCOUNT_ID}:role/semestabank-emr-serverless-exec",
+        "JobDriver": {
+          "SparkSubmit": {
+            "EntryPoint": "s3://semestabank-artifacts/jobs/account_snapshot.py",
+            "EntryPointArguments.$": "States.Array('--date', $.snapshot_date)"
+          }
+        }
+      },
+      "Retry": [{ "ErrorEquals": ["States.ALL"], "MaxAttempts": 3, "IntervalSeconds": 120, "BackoffRate": 2.0 }],
+      "Catch": [{ "ErrorEquals": ["States.ALL"], "Next": "AlertOnCall" }],
+      "Next": "GoldViews"
+    },
+    "GoldViews": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::aws-sdk:emrserverless:startJobRun.sync",
+      "Parameters": {
+        "ApplicationId": "${EMR_SERVERLESS_APP_ID}",
+        "ExecutionRoleArn": "arn:aws:iam::${ACCOUNT_ID}:role/semestabank-emr-serverless-exec",
+        "JobDriver": { "SparkSubmit": { "EntryPoint": "s3://semestabank-artifacts/jobs/gold_scorecard.py" } }
+      },
+      "Retry": [{ "ErrorEquals": ["States.ALL"], "MaxAttempts": 3, "IntervalSeconds": 120, "BackoffRate": 2.0 }],
+      "Catch": [{ "ErrorEquals": ["States.ALL"], "Next": "AlertOnCall" }],
+      "Next": "TriggerCreditScoring"
+    },
+    "TriggerCreditScoring": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::states:startExecution",
+      "Parameters": {
+        "StateMachineArn": "arn:aws:states:${REGION}:${ACCOUNT_ID}:stateMachine:credit-scoring-pipeline",
+        "Input": { "snapshot_date.$": "$.snapshot_date", "trigger": "account_snapshot_ready" }
+      },
+      "End": true
+    },
+    "AlertOnCall": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sns:publish",
+      "Parameters": {
+        "TopicArn": "arn:aws:sns:${REGION}:${ACCOUNT_ID}:semestabank-data-eng-alerts",
+        "Subject": "[SemestaBank ALERT] Lakehouse pipeline FAILED after 3 retries",
+        "Message.$": "States.Format('Pipeline failed. Execution: {}. Snapshot date: {}. All 3 retries exhausted — investigate.', $$.Execution.Name, $.snapshot_date)"
+      },
+      "Next": "FailState"
+    },
+    "FailState": { "Type": "Fail", "Error": "PipelineFailed", "Cause": "A Spark step failed after 3 retries; on-call paged via SNS." }
+  }
+}

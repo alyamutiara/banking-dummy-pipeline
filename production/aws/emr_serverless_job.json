@@ -1,0 +1,32 @@
+{
+  "_comment": "SemestaBank Q1 — run the SAME PySpark job on AWS EMR Serverless. The job code is unchanged from the local stack; only the runtime, storage (s3://), and secret source differ. Submit with: aws emr-serverless start-job-run --cli-input-json file://emr_serverless_job.json",
+  "applicationId": "${EMR_SERVERLESS_APP_ID}",
+  "executionRoleArn": "arn:aws:iam::${ACCOUNT_ID}:role/semestabank-emr-serverless-exec",
+  "name": "account_snapshot",
+  "jobDriver": {
+    "sparkSubmit": {
+      "entryPoint": "s3://semestabank-artifacts/jobs/account_snapshot.py",
+      "entryPointArguments": ["--date", "${SNAPSHOT_DATE}"],
+      "sparkSubmitParameters": "--conf spark.executor.cores=4 --conf spark.executor.memory=8g --conf spark.sql.sources.partitionOverwriteMode=dynamic --conf spark.hadoop.fs.s3a.aws.credentials.provider=com.amazonaws.auth.WebIdentityTokenCredentialsProvider --conf spark.jars=s3://semestabank-artifacts/jars/ojdbc11.jar"
+    }
+  },
+  "configurationOverrides": {
+    "monitoringConfiguration": {
+      "s3MonitoringConfiguration": { "logUri": "s3://semestabank-logs/emr-serverless/" },
+      "managedPersistenceMonitoringConfiguration": { "enabled": true }
+    },
+    "applicationConfiguration": [
+      {
+        "classification": "spark-defaults",
+        "properties": {
+          "spark.dynamicAllocation.enabled": "true",
+          "spark.emr-serverless.driverEnv.S3_BUCKET_BRONZE": "semestabank-bronze",
+          "spark.emr-serverless.driverEnv.S3_BUCKET": "semestabank-silver",
+          "spark.emr-serverless.driverEnv.S3_PATH": "account_snapshots",
+          "spark.emr-serverless.driverEnv.S3_BUCKET_GOLD": "semestabank-gold"
+        }
+      }
+    ]
+  },
+  "tags": { "team": "data-eng", "question": "q1b" }
+}
